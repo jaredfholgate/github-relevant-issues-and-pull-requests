@@ -20,7 +20,7 @@ It uses the GitHub API to search for issues and pull requests in repositories yo
   ./Get-GitHubIssuesAndPullRequests.ps1
   ```
   
-  To filter by one or more labels, use the `-label` parameter:
+  To filter by one or more labels, use the `-labels` parameter:
   
   ```pwsh  
   ./Get-GitHubIssuesAndPullRequests.ps1 -labels "bug","enhancement"

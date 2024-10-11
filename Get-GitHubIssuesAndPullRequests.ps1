@@ -23,7 +23,9 @@ $urlEncodedQuery = [System.Web.HttpUtility]::UrlEncode($query)
 $issues = ConvertFrom-Json $(gh api "/search/issues?q=$urlEncodedQuery+type:issue+state:open&sort=$orderBy&order=desc&per_page=100")
 $pullRequests = ConvertFrom-Json $(gh api "/search/issues?q=$urlEncodedQuery+type:pr+state:open&sort=$orderBy&order=desc&per_page=100")
 
-Write-Host "Issues"
+Write-Host ""
+Write-Host "Issues" -ForegroundColor DarkBlue
+Write-Host "------" -ForegroundColor DarkBlue
 if($issues.items.Count -eq 0) {
   Write-Host "No issues found. Happy days!" -ForegroundColor Green
   Write-Host ""
@@ -31,7 +33,8 @@ if($issues.items.Count -eq 0) {
   $issues.items | Format-Table -Property html_url, created_at, @{ Label = "created_by"; Expression = {$_.user.login} }, title, @{ Label = "assigned_to"; Expression = {$_.assignee.login} } -AutoSize
 }
 
-Write-Host "Pull Requests"
+Write-Host "Pull Requests" -ForegroundColor DarkBlue
+Write-Host "-------------" -ForegroundColor DarkBlue
 if($pullRequests.items.Count -eq 0) {
   Write-Host "No pull requests found. Happy days!" -ForegroundColor Green
   Write-Host ""

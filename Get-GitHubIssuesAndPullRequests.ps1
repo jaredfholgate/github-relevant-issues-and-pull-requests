@@ -1,7 +1,10 @@
 # PowerShell to see issues and pull requests from watched repositories
 param(
   $labels = @(),
-  $orderBy = "created" # created, updated, etc https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#search-issues-and-pull-requests
+  $orderBy = "created", # created, updated, etc https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#search-issues-and-pull-requests
+  $orderDirection = "desc", # asc, desc
+  $itemsPerPage = 100, # Max 100
+  $state = "open" # open, closed
 )
 
 $watchedRepos = ConvertFrom-Json $(gh api "/user/subscriptions")
@@ -20,24 +23,29 @@ if($labels.Count -gt 0) {
 
 $urlEncodedQuery = [System.Web.HttpUtility]::UrlEncode($query)
 
-$issues = ConvertFrom-Json $(gh api "/search/issues?q=$urlEncodedQuery+type:issue+state:open&sort=$orderBy&order=desc&per_page=100")
-$pullRequests = ConvertFrom-Json $(gh api "/search/issues?q=$urlEncodedQuery+type:pr+state:open&sort=$orderBy&order=desc&per_page=100")
+$queryTemplate = "/search/issues?q=$urlEncodedQuery+type:{0}+state:$state&sort=$orderBy&order=$orderDirection&per_page=$itemsPerPage"
 
-Write-Host ""
-Write-Host "Issues" -ForegroundColor DarkBlue
-Write-Host "------" -ForegroundColor DarkBlue
-if($issues.items.Count -eq 0) {
-  Write-Host "No issues found. Happy days!" -ForegroundColor Green
-  Write-Host ""
-} else {
-  $issues.items | Format-Table -Property html_url, created_at, @{ Label = "created_by"; Expression = {$_.user.login} }, title, @{ Label = "assigned_to"; Expression = {$_.assignee.login} } -AutoSize
-}
+$itemTypes = @(
+  @{
+    name = "Issues"
+    query = [string]::Format($queryTemplate, "issue")
+  },
+  @{
+    name = "Pull Requests"
+    query = [string]::Format($queryTemplate, "pr")
+  }
+)
 
-Write-Host "Pull Requests" -ForegroundColor DarkBlue
-Write-Host "-------------" -ForegroundColor DarkBlue
-if($pullRequests.items.Count -eq 0) {
-  Write-Host "No pull requests found. Happy days!" -ForegroundColor Green
+foreach($itemType in $itemTypes) {
+  $items = ConvertFrom-Json $(gh api "$($itemType.query)")
+
   Write-Host ""
-} else {
-  $pullRequests.items | Format-Table -Property html_url, created_at, @{ Label = "created_by"; Expression = {$_.user.login} }, title, @{ Label = "assigned_to"; Expression = {$_.assignee.login} } -AutoSize
+  Write-Host $itemType.name -ForegroundColor DarkBlue
+  Write-Host "------" -ForegroundColor DarkBlue
+  if($items.items.Count -eq 0) {
+    Write-Host "No $($itemType.name) found. Happy days!" -ForegroundColor Green
+    Write-Host ""
+  } else {
+    $items.items | Format-Table -Property html_url, created_at, @{ Label = "created_by"; Expression = {$_.user.login} }, title, @{ Label = "assigned_to"; Expression = {$_.assignee.login} } -AutoSize
+  }
 }

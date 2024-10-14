@@ -40,3 +40,32 @@ It uses the GitHub API to search for issues and pull requests in repositories yo
   ```pwsh
   ./Get-GitHubIssuesAndPullRequests.ps1 -orderBy "updated"
   ```
+
+## Create a shortcut to run the script directly (Windows)
+
+1. Create scripts that generates the output you need. See the examples in the `examples` folder.
+
+    Examples:
+  
+    ```pwsh
+    Write-Host "Getting All Open Issues and Pull Requests"
+    /Users/myuser/Code/github-relevant-issues-and-pull-requests/Get-GitHubIssuesAndPullRequests.ps1
+    Read-Host -Prompt "Press Enter to exit"
+    ```
+  
+    ```powershell
+    Write-Host "Getting Open Issues and Pull Requests Requiring Triage"
+    $labels = @("Needs: Triage :mag:")
+    /Users/myuser/Code/github-relevant-issues-and-pull-requests/Get-GitHubIssuesAndPullRequests.ps1 -labels $labels
+    Read-Host -Prompt "Press Enter to exit"
+    ```
+  
+1. Create a shortcut that executes the PowerShell. Right-click on the desktop and select `New` -> `Shortcut`.
+1. Enter a target that looks like the following:
+
+    ```text
+    pwsh -command "& 'C:\Users\myuser\Code\Get-IssuesAndPullRequestsNeedingTriage.ps1'"
+    ```
+
+1. Give the shortcut a name and click `Finish`.
+1. Now you can double-click the shortcut to run the script or add it to your taskbar.

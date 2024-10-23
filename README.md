@@ -50,14 +50,14 @@ It uses the GitHub API to search for issues and pull requests in repositories yo
     ```pwsh
     Write-Host "Getting All Open Issues and Pull Requests"
     /Users/myuser/Code/github-relevant-issues-and-pull-requests/Get-GitHubIssuesAndPullRequests.ps1
-    Read-Host -Prompt "Press Enter to exit"
+    Read-Host -Prompt "Press any key to exit"
     ```
   
     ```powershell
     Write-Host "Getting Open Issues and Pull Requests Requiring Triage or Attention"
     $labels = @("Needs: Triage :mag:", "Needs: Attention :wave:", "Needs: Immediate Attention :bangbang:")
     /Users/myuser/Code/github-relevant-issues-and-pull-requests/Get-GitHubIssuesAndPullRequests.ps1 -labels $labels
-    Read-Host -Prompt "Press Enter to exit"
+    Read-Host -Prompt "Press any key to exit"
     ```
   
 1. Create a shortcut that executes the PowerShell. Right-click on the desktop and select `New` -> `Shortcut`.

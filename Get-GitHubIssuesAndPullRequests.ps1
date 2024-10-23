@@ -1,11 +1,72 @@
 # PowerShell to see issues and pull requests from watched repositories
 param(
   $labels = @(),
+  $labelsLogic = "or", # or, and
   $orderBy = "created", # created, updated, etc https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#search-issues-and-pull-requests
   $orderDirection = "desc", # asc, desc
   $itemsPerPage = 100, # Max 100
-  $state = "open" # open, closed
+  $state = "open", # open, closed
+  $emojiListFileName = "emoji-list-short.csv"
 )
+
+function Get-EmojiList {
+  param(
+    [string] $listFileName = "emoji-list-short.csv"
+  )
+  $emojiCsvPath = "$PSScriptRoot/$listFileName"
+  $emojiCsv = Import-Csv $emojiCsvPath
+
+  $emojiHashTable = @{}
+
+  foreach($emoji in $emojiCsv) {
+    $emojiHashTable[$emoji.key] = $emoji.symbol
+  }
+
+  return $emojiHashTable
+}
+
+function Format-Hyperlink {
+  param(
+    [Parameter(ValueFromPipeline = $true, Position = 0)]
+    [ValidateNotNullOrEmpty()]
+    [Uri] $Uri,
+
+    [Parameter(Mandatory=$false, Position = 1)]
+    [string] $Label
+  )
+
+  if ($Label) {
+    return "`e]8;;$Uri`e\$Label`e]8;;`e\"
+  }
+
+  return "$Uri"
+}
+
+function Format-Emoji {
+  param(
+    [string] $originalString,
+    [hashtable] $emojiList
+  )
+
+  if(!$originalString.Contains(":")) {
+    return $originalString
+  }
+
+  #$originalString = "Needs: Attention :wave: :bang_bang:"
+
+  $regex = ':([a-z_]*?):'
+  $emojiMatches = $originalString | Select-String -Pattern $regex -AllMatches
+
+  foreach($match in $emojiMatches.Matches) {
+    if($emojiList.ContainsKey($match.Value)) {
+      $originalString = $originalString.Replace($match.Value, $emojiList[$match.Value])
+    }
+  }
+
+  return $originalString
+}
+
+$emojiList = Get-EmojiList -listFileName $emojiListFileName
 
 $watchedRepos = ConvertFrom-Json $(gh api "/user/subscriptions")
 
@@ -16,14 +77,29 @@ foreach($repo in $watchedRepos) {
 }
 
 if($labels.Count -gt 0) {
-  foreach($label in $labels) {
-    $query = "$query label:`"$($label)`""
+  if($labelsLogic -eq "or") {
+    $query = "$query label:"
+    $isFirst = $true
+    foreach($label in $labels) {
+      if($isFirst) {
+        $isFirst = $false
+        $query = "$query`"$($label)`""
+      } else {
+        $query = "$query,`"$($label)`""
+      }
+    }
+  } else {
+    foreach($label in $labels) {
+      $query = "$query label:`"$($label)`""
+    }
   }
 }
 
 $urlEncodedQuery = [System.Web.HttpUtility]::UrlEncode($query)
 
 $queryTemplate = "/search/issues?q=$urlEncodedQuery+type:{0}+state:$state&sort=$orderBy&order=$orderDirection&per_page=$itemsPerPage"
+
+Write-Verbose "Query: $queryTemplate"
 
 $itemTypes = @(
   @{
@@ -46,6 +122,44 @@ foreach($itemType in $itemTypes) {
     Write-Host "No $($itemType.name) found. Happy days!" -ForegroundColor Green
     Write-Host ""
   } else {
-    $items.items | Format-Table -Property html_url, created_at, @{ Label = "created_by"; Expression = {$_.user.login} }, title, @{ Label = "assigned_to"; Expression = {$_.assignee.login} } -AutoSize
+    $formattedItems = @()
+    foreach($item in $items.items) {
+      # Format the output
+      $number = $item.number
+      $title = $item.title
+      $htmlUrl = $item.html_url
+      $orgRepoSplit = $htmlUrl -split "/"
+      $organization = $orgRepoSplit[3]
+      $repository = $orgRepoSplit[4]
+      $createdBy = $item.user.login
+      $created = $item.created_at.ToString("yyyy-MM-dd HH:mm")
+      $updated = $item.updated_at.ToString("yyyy-MM-dd HH:mm")
+      $assignedTo = $null -eq $item.assignee.login -or $item.assignee.login -eq "" ? "unassigned" : $item.assignee.login
+      $label = ""
+      foreach($labelObect in $item.labels) {
+        if($labels -contains $labelObect.name) {
+          $label = Format-Emoji -originalString $labelObect.name -emojiList $emojiList
+          break
+        }
+      }
+
+      #Add to the array
+      $formattedItems += @{
+        id = Format-Hyperlink -Uri $htmlUrl -Label $number
+        title = $title
+        organizationRepository = Format-Hyperlink -Uri $htmlUrl -Label "$organization/$repository"
+        createdBy = Format-Hyperlink -Uri $htmlUrl -Label $createdBy
+        created = Format-Hyperlink -Uri $htmlUrl -Label $created
+        updated = Format-Hyperlink -Uri $htmlUrl -Label $updated
+        assignedTo = Format-Hyperlink -Uri $htmlUrl -Label $assignedTo
+        label = Format-Hyperlink -Uri $htmlUrl -Label $label
+      }
+    }
+
+    if($labels.Count -gt 0) {
+      $formattedItems | ForEach-Object {[PSCustomObject]$_} | Format-Table -Property id, label, @{ Label = "repo"; Expression = {$_.organizationRepository} }, created, createdBy, updated, assignedTo, title -AutoSize -Wrap
+    } else {
+      $formattedItems | ForEach-Object {[PSCustomObject]$_} | Format-Table -Property id, @{ Label = "repo"; Expression = {$_.organizationRepository} }, created, createdBy, updated, assignedTo, title -AutoSize -Wrap
+    }
   }
 }

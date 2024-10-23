@@ -27,7 +27,7 @@ It uses the GitHub API to search for issues and pull requests in repositories yo
   ```
 
   ```pwsh  
-  $labels = @("Needs: Triage :mag:")
+  $labels = @("Needs: Triage :mag:", "Needs: Attention :wave:", "Needs: Immediate Attention :bangbang:")
   ./Get-GitHubIssuesAndPullRequests.ps1 -labels $labels
   ```
   
@@ -54,8 +54,8 @@ It uses the GitHub API to search for issues and pull requests in repositories yo
     ```
   
     ```powershell
-    Write-Host "Getting Open Issues and Pull Requests Requiring Triage"
-    $labels = @("Needs: Triage :mag:")
+    Write-Host "Getting Open Issues and Pull Requests Requiring Triage or Attention"
+    $labels = @("Needs: Triage :mag:", "Needs: Attention :wave:", "Needs: Immediate Attention :bangbang:")
     /Users/myuser/Code/github-relevant-issues-and-pull-requests/Get-GitHubIssuesAndPullRequests.ps1 -labels $labels
     Read-Host -Prompt "Press Enter to exit"
     ```

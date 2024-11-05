@@ -176,8 +176,9 @@ foreach($itemType in $itemTypes) {
   }
 
   Write-Host ""
-  Write-Host "$($itemType.name) ($($formattedItems.Count))" -ForegroundColor DarkBlue
-  Write-Host "------" -ForegroundColor DarkBlue
+  $title = "$($itemType.name) ($($formattedItems.Count))"
+  Write-Host $title -ForegroundColor DarkBlue
+  Write-Host ("-" * $title.Length) -ForegroundColor DarkBlue
   if($formattedItems.Count -eq 0) {
     Write-Host "No $($itemType.name) found. Happy days!" -ForegroundColor Green
     Write-Host ""

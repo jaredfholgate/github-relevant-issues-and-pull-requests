@@ -6,9 +6,9 @@ It uses the GitHub API to search for issues and pull requests in repositories yo
 
 ## Prequisites
 
-1. Install the GitHub CLI (gh) from https://cli.github.com/
+1. Install the GitHub CLI (gh) from <https://cli.github.com/>
 1. Login to GitHub using `gh auth login`
-1. Head over to https://github.com/watching and make sure you are only watching the repositories you are responsible for. Must be set to `All activity` at this time.
+1. Head over to <https://github.com/watching> and make sure you are only watching the repositories you are responsible for. Must be set to `All activity` at this time.
 
 ## Usage
 

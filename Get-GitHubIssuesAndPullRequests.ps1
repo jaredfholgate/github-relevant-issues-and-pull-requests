@@ -6,7 +6,10 @@ param(
   $orderDirection = "desc", # asc, desc
   $itemsPerPage = 100, # Max 100
   $state = "open", # open, closed
-  $emojiListFileName = "emoji-list-short.csv"
+  $emojiListFileName = "emoji-list-short.csv",
+  $repositories = @(), # Extra repositories to include in the search (e.g. "organization/repo")
+  $includeWatchedRepositories = $true, # Include watched repositories in the search
+  $repositoriesToFilterByAssigned = @() # Repositories where issues should be filtered based on the assigned_to (e.g. "organization/repo")
 )
 
 function Get-EmojiList {
@@ -52,8 +55,6 @@ function Format-Emoji {
     return $originalString
   }
 
-  #$originalString = "Needs: Attention :wave: :bang_bang:"
-
   $regex = ':([a-z_]*?):'
   $emojiMatches = $originalString | Select-String -Pattern $regex -AllMatches
 
@@ -68,12 +69,18 @@ function Format-Emoji {
 
 $emojiList = Get-EmojiList -listFileName $emojiListFileName
 
-$watchedRepos = ConvertFrom-Json $(gh api "/user/subscriptions")
-
 $query = ""
 
-foreach($repo in $watchedRepos) {
-  $query += "repo:$($repo.owner.login)/$($repo.name) "
+if($includeWatchedRepositories) {
+  $watchedRepos = ConvertFrom-Json $(gh api "/user/subscriptions")
+
+  foreach($repo in $watchedRepos) {
+    $query += "repo:$($repo.owner.login)/$($repo.name) "
+  }
+}
+
+foreach($repo in $repositories) {
+  $query += "repo:$repo "
 }
 
 if($labels.Count -gt 0) {
@@ -95,6 +102,9 @@ if($labels.Count -gt 0) {
   }
 }
 
+$username = (ConvertFrom-Json $(gh api "/user")).login
+#$teams = (ConvertFrom-Json $(gh api "/user/teams"))  #TODO: Filter pull requests by team assigned reviewers? Does not appear in search results, so would require extra API calls
+
 $urlEncodedQuery = [System.Web.HttpUtility]::UrlEncode($query)
 
 $queryTemplate = "/search/issues?q=$urlEncodedQuery+type:{0}+state:$state&sort=$orderBy&order=$orderDirection&per_page=$itemsPerPage"
@@ -113,49 +123,65 @@ $itemTypes = @(
 )
 
 foreach($itemType in $itemTypes) {
-  $items = ConvertFrom-Json $(gh api "$($itemType.query)")
+  $page = 1
+  $items = @()
+  $incompleteResults = $true
 
-  Write-Host ""
-  Write-Host $itemType.name -ForegroundColor DarkBlue
-  Write-Host "------" -ForegroundColor DarkBlue
-  if($items.items.Count -eq 0) {
-    Write-Host "No $($itemType.name) found. Happy days!" -ForegroundColor Green
-    Write-Host ""
-  } else {
-    $formattedItems = @()
-    foreach($item in $items.items) {
-      # Format the output
-      $number = $item.number
-      $title = $item.title
-      $htmlUrl = $item.html_url
-      $orgRepoSplit = $htmlUrl -split "/"
-      $organization = $orgRepoSplit[3]
-      $repository = $orgRepoSplit[4]
-      $createdBy = $item.user.login
-      $created = $item.created_at.ToString("yyyy-MM-dd HH:mm")
-      $updated = $item.updated_at.ToString("yyyy-MM-dd HH:mm")
-      $assignedTo = $null -eq $item.assignee.login -or $item.assignee.login -eq "" ? "unassigned" : $item.assignee.login
-      $label = ""
-      foreach($labelObect in $item.labels) {
-        if($labels -contains $labelObect.name) {
-          $label = Format-Emoji -originalString $labelObect.name -emojiList $emojiList
-          break
-        }
-      }
+  # Get the paged results
+  while($incompleteResults) {
+    $response = ConvertFrom-Json $(gh api "$($itemType.query)&page=$page")
+    $items += $response.items
+    $incompleteResults = $page * $itemsPerPage -lt $response.total_count
+    $page++
+  }
 
-      #Add to the array
-      $formattedItems += @{
-        id = Format-Hyperlink -Uri $htmlUrl -Label $number
-        title = $title
-        organizationRepository = Format-Hyperlink -Uri $htmlUrl -Label "$organization/$repository"
-        createdBy = Format-Hyperlink -Uri $htmlUrl -Label $createdBy
-        created = Format-Hyperlink -Uri $htmlUrl -Label $created
-        updated = Format-Hyperlink -Uri $htmlUrl -Label $updated
-        assignedTo = Format-Hyperlink -Uri $htmlUrl -Label $assignedTo
-        label = Format-Hyperlink -Uri $htmlUrl -Label $label
+  $formattedItems = @()
+  foreach($item in $items) {
+    # Format the output
+    $assignedTo = $null -eq $item.assignee.login -or $item.assignee.login -eq "" ? "unassigned" : $item.assignee.login
+    $htmlUrl = $item.html_url
+    $orgRepoSplit = $htmlUrl -split "/"
+    $organization = $orgRepoSplit[3]
+    $repository = $orgRepoSplit[4]
+    $organizationRepository = "$organization/$repository"
+    
+    if($repositoriesToFilterByAssigned -contains $organizationRepository -and $assignedTo -ne $username) {
+      continue
+    }
+
+    $number = $item.number
+    $title = $item.title
+    $createdBy = $item.user.login
+    $created = $item.created_at.ToString("yyyy-MM-dd HH:mm")
+    $updated = $item.updated_at.ToString("yyyy-MM-dd HH:mm")
+    $label = ""
+    foreach($labelObect in $item.labels) {
+      if($labels -contains $labelObect.name) {
+        $label = Format-Emoji -originalString $labelObect.name -emojiList $emojiList
+        break
       }
     }
 
+    #Add to the array
+    $formattedItems += @{
+      id = Format-Hyperlink -Uri $htmlUrl -Label $number
+      title = $title
+      organizationRepository = Format-Hyperlink -Uri $htmlUrl -Label $organizationRepository
+      createdBy = Format-Hyperlink -Uri $htmlUrl -Label $createdBy
+      created = Format-Hyperlink -Uri $htmlUrl -Label $created
+      updated = Format-Hyperlink -Uri $htmlUrl -Label $updated
+      assignedTo = Format-Hyperlink -Uri $htmlUrl -Label $assignedTo
+      label = Format-Hyperlink -Uri $htmlUrl -Label $label
+    }
+  }
+
+  Write-Host ""
+  Write-Host "$($itemType.name) ($($formattedItems.Count))" -ForegroundColor DarkBlue
+  Write-Host "------" -ForegroundColor DarkBlue
+  if($formattedItems.Count -eq 0) {
+    Write-Host "No $($itemType.name) found. Happy days!" -ForegroundColor Green
+    Write-Host ""
+  } else {
     if($labels.Count -gt 0) {
       $formattedItems | ForEach-Object {[PSCustomObject]$_} | Format-Table -Property id, label, @{ Label = "repo"; Expression = {$_.organizationRepository} }, created, createdBy, updated, assignedTo, title -AutoSize -Wrap
     } else {

@@ -41,6 +41,18 @@ It uses the GitHub API to search for issues and pull requests in repositories yo
   ./Get-GitHubIssuesAndPullRequests.ps1 -orderBy "updated"
   ```
 
+  To add additional repositories not in the watch list and only see issues and pull requests assigned to you, use the `-repositories` and `-repositoriesToFilterIssuesByAssigned` parameters:
+
+  ```pwsh
+  $labels = @("Needs: Triage :mag:", "Needs: Attention :wave:", "Needs: Immediate Attention :bangbang:")
+  $additionalRepositories = @("Azure/bicep-registry-modules")  # Additional repositories to include in the output
+  $repositoriesToFilterIssuesByAssigned = @("Azure/bicep-registry-modules")  # Repositories to filter issues and pull requests by assigned to me
+  ./Get-GitHubIssuesAndPullRequests.ps1 `
+    -labels $labels `
+    -repositories $additionalRepositories `
+    -repositoriesToFilterIssuesByAssigned $repositoriesToFilterIssuesByAssigned
+  ```
+
 ## Create a shortcut to run the script directly (Windows)
 
 1. Create scripts that generates the output you need. See the examples in the `examples` folder.
